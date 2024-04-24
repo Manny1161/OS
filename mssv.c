@@ -2,10 +2,102 @@
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <unistd.h>
 #include "definitions.h"
 
-void* child_threads(void* arg)
+/*Shared variables used by threads*/
+Sol sudoku;
+int Row[ROWS + 1] = {0};
+int Col[COLS + 1] = {0};
+int Sub[SUB + 1] = {0};
+int count = 0;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+/*Row validator function*/
+void* val_rows(void* arg)
 {
+	T_Parameters* args = (T_Parameters*)arg;
+	long child_thread = args->child_thread;
+	char** argv = args->argv;
+	int row_st = child_thread * SUB + 1;
+	int row_en = row_st + SUB;
+	int valid_rows = 0;
+
+	for(int i=row_st; i<row_en; i++)
+	{
+		/*implement logic*/
+		valid_rows++;
+	}
+
+	/*synchronisation mechanims*/
+	pthread_mutex_lock(&mutex);
+	count += valid_rows;
+	pthread_mutex_unlock(&mutex);
+	sleep(atoi(argv[2]));
+
+	pthread_mutex_lock(&mutex);
+	pthread_cond_signal(&cond);
+	pthread_mutex_unlock(&mutex);
+
+	pthread_exit(NULL);
+}
+
+/*Column validator function*/
+void*  val_cols(void *arg)
+{
+	T_Parameters* args = (T_Parameters*)arg;
+	long child_thread = args->child_thread;
+	char** argv = args->argv;
+	int col_st = child_thread * SUB + 1;
+	int col_en = col_st + SUB;
+	int valid_cols = 0;
+
+	for(int i=col_st; i<col_en; i++)
+	{
+		/*implement logic*/
+		valid_cols++;
+	}
+
+	/*synchronisation mechanims*/
+	pthread_mutex_lock(&mutex);
+	count += valid_cols;
+	pthread_mutex_unlock(&mutex);
+	sleep(atoi(argv[2]));
+
+	pthread_mutex_lock(&mutex);
+	pthread_cond_signal(&cond);
+	pthread_mutex_unlock(&mutex);
+
+	pthread_exit(NULL);
+}
+
+/*Sub grid validator function*/
+void* val_subs(void *arg)
+{
+	T_Parameters* args = (T_Parameters*)arg;
+	long child_thread = args->child_thread;
+	char** argv = args->argv;
+	int sub_st = child_thread * SUB + 1;
+	int sub_en = sub_st + SUB;
+	int valid_subs = 0;
+
+	for(int i=sub_st; i<sub_en; i++)
+	{
+		/*implement logic*/
+		valid_subs++;
+	}
+
+	/*synchronisation mechanims*/
+	pthread_mutex_lock(&mutex);
+	count += valid_subs;
+	pthread_mutex_unlock(&mutex);
+	sleep(atoi(argv[2]));
+
+	pthread_mutex_lock(&mutex);
+	pthread_cond_signal(&cond);
+	pthread_mutex_unlock(&mutex);
+
 	pthread_exit(NULL);
 }
 
@@ -28,13 +120,12 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	/*read initial input file (9x9) grid*/
-	int grid[ROWS][COLS];
 	for(int i=0; i<ROWS; i++)
 	{
 		for(int j=0; j<COLS; j++)
 		{
 			/*Check validity of input file*/
-			if(fscanf(file, "%d", &grid[i][j]) != 1)
+			if(fscanf(file, "%d", &sudoku.grid[i][j]) != 1)
 			{
 				printf("ERROR: file contains invalid format!\n");
 				fclose(file);
@@ -44,31 +135,43 @@ int main(int argc, char* argv[])
 	}
 	fclose(file);
 
-	pthread_t parent;
-	pthread_t child[NUM_CHILDREN];
+	pthread_t threads[NUM_CHILDREN];
 	int bit;
+	T_Parameters args[NUM_CHILDREN];
 
 	/*variable bit used to check if the creation of thread was successful*/
 	/*if bit initialised to 0 = successful, else unsuccessful*/
-	bit = pthread_create(&parent, NULL, child_threads, (void *)0);
-	if(bit)
-	{
-		printf("ERROR: Unable to create parent thread. Bit = %d\n", bit);
-		return 1;
-	}
 	for(long i=0; i<NUM_CHILDREN; i++)
 	{
-		bit = pthread_create(&child[i], NULL, child_threads, (void *)(i+1));
+		args[i].child_thread = i;
+		args[i].argv = argv;
+		if(i<SUB)
+		{
+			/*Create child thread to validate sub grids*/
+			bit = pthread_create(&threads[i], NULL, val_subs, (void *)&args[i]);
+		}
+		else if(i<SUB + ROW_T)
+		{
+			/*Create child thread to validate rows*/
+			bit = pthread_create(&threads[i], NULL, val_rows, (void *)&args[i]);
+		}
+		else
+		{
+			/*Create child thread to validate columns*/
+			bit = pthread_create(&threads[i], NULL, val_cols, (void *)&args[i]);
+		}
 		if(bit)
 		{
 			printf("ERROR: Unable to create child thread. Bit = %d\n", bit);
 			return 1;
 		}
 	}
-	pthread_join(parent, NULL);
-	for(int i=0; i<NUM_CHILDREN; i++)
+	
+	pthread_mutex_lock(&mutex);
+	while(count<NUM_CHILDREN)
 	{
-		pthread_join(child[i], NULL);
+		pthread_cond_wait(&cond, &mutex);
 	}
+	pthread_mutex_unlock(&mutex);
 	return 0;
 }
