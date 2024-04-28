@@ -4,13 +4,18 @@
 #define ROWS 9
 #define COLS 9
 #define NUM_CHILDREN 4
-#define SUB 3
+#define SUB 9
 #define ROW_T 3
 
 typedef struct
 {
-    long child_thread;
+    int child_id;
+    int row_st;
+    int row_en;
+    int col_st;
+    int col_en;
     char** argv;
+    int* result;
 } T_Parameters;
 
 
