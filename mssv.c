@@ -24,53 +24,54 @@ void* val_rows(void* arg)
 	int* result = args->result;
 	int valid_rows = 0;
 	int valid_subs = 0;
-	/*validate rows*/
+	/*Validate rows*/
 	for(int i=row_st; i<=row_en; i++)
 	{
-		int row_set[ROWS + 1] = {0};
 		for(int j=0;j<ROWS;j++)
 		{
 			int val = sudoku.grid[i-1][j];
-			if(val<1 || val>9 || row_set[val]==1)
+			/*Invalid rows*/
+			if(val<1 || val>9 || Row[val]==1)
 			{
 				*result = 0;
 				pthread_exit(NULL);
 			}
-			row_set[val] = 1;
+			Row[val] = 1;
 		}
 		valid_rows++;
-		Row[i] = 1;
+		memset(Row, 0, sizeof(Row)); /*Reset row array for the next iteration*/
 	}
-
+	/*Validate sub-grids*/
 	for (int i = row_st; i <= row_en; i += 3)
     {
         for (int j = 0; j < COLS; j += 3)
         {
-            int sub_set[COLS + 1] = {0};
             for (int r = i; r < i + 3; r++)
             {
                 for (int c = j; c < j + 3; c++)
                 {
                     int val = sudoku.grid[r - 1][c];
-                    if (val < 1 || val > 9 || sub_set[val] == 1)
+					/*Invalid sub-grids*/
+                    if (val < 1 || val > 9 || Sub[val] == 1)
                     {
                         *result = 0;
                         pthread_exit(NULL);
                     }
-                    sub_set[val] = 1;
+                    Sub[val] = 1;
                 }
             }
             valid_subs++;
+			memset(Sub, 0, sizeof(Sub));
         }
     }
 
-	/*synchronisation mechanims*/
+	/*Synchronisation mechanims*/
 	pthread_mutex_lock(&mutex);
 	count += valid_rows;
 	count+= valid_subs;
 	pthread_mutex_unlock(&mutex);
 
-	/*Valid*/
+	/*Valid rows & sub-grids*/
 	*result = 1;
 	sleep(atoi(argv[2]));
 
@@ -92,33 +93,31 @@ void*  val_cols(void *arg)
 	int valid_cols = 0;
 	for(int i=col_st; i<=col_en; i++)
 	{
-		int col_set[COLS + 1] = {0};
 		for(int j=0;j<COLS;j++)
 		{
 			int val = sudoku.grid[j][i-1];
 			/*Invalid*/
-			if(val<1 || val>9 || col_set[val] == 1)
+			if(val<1 || val>9 || Col[val] == 1)
 			{
 				*result = 0;
 				pthread_exit(NULL);
 			}
-			col_set[val] = 1;
+			Col[val] = 1;
 		}
 		valid_cols++;
+		memset(Col, 0, sizeof(Col));
 	}
 
 
-	/*synchronisation mechanims*/
+	/*Synchronisation mechanims*/
 	pthread_mutex_lock(&mutex);
+	/*Valid*/
 	for(int i=col_st;i<=col_en;i++)
 	{
 		*result = 1;
 	}
 	count += valid_cols;
 	pthread_mutex_unlock(&mutex);
-	
-	/*Valid
-	*result = 1;*/
 	sleep(atoi(argv[2]));
 
 	pthread_mutex_lock(&mutex);
@@ -146,12 +145,12 @@ int main(int argc, char* argv[])
 		printf("ERROR: Integer must be between 1 and 10!\n");
 		return 1;
 	}
-	/*read initial input file (9x9) grid*/
+	/*Read initial input file (9x9) grid*/
 	for(int i=0; i<ROWS; i++)
 	{
 		for(int j=0; j<COLS; j++)
 		{
-			/*Check validity of input file*/
+			/*Check validity of input file and store it in Sol struct*/
 			if(fscanf(file, "%d", &sudoku.grid[i][j]) != 1)
 			{
 				printf("ERROR: file contains invalid format!\n");
@@ -165,8 +164,9 @@ int main(int argc, char* argv[])
 	pthread_t threads[NUM_CHILDREN];
 	T_Parameters args[NUM_CHILDREN];
 	int result[NUM_CHILDREN] = {0};
-
 	int index = 0;
+
+	/**/
 	for(int i=0;i<NUM_CHILDREN;i++)
 	{
 		if(i<3)
@@ -190,6 +190,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	/**/
 	int last_child;
 	for(int i=0;i<NUM_CHILDREN;i++)
 	{
@@ -219,9 +220,14 @@ int main(int argc, char* argv[])
 			}
 		}
 	}
-
-	printf("There are %d valid sub-grids, and thus the solution is %s.\n", count, (count == 27) ? "valid" : "invalid");
+	if(count==27)
+	{
+		printf("There are %d valid sub-grids, and thus the solution is valid.\n", count);
+	}
+	else
+	{
+		printf("There are in total %d valid rows, columns, sub-grids and the solution is invalid.\n", count);
+	}
 	printf("Thread ID-%d is the last thread\n", last_child);
-
 	return 0;
 }
