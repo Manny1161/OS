@@ -5,7 +5,6 @@
 #define COLS 9
 #define NUM_CHILDREN 4
 #define SUB 9
-#define ROW_T 3
 
 typedef struct
 {
@@ -26,6 +25,5 @@ typedef struct
 
 void* val_rows(void* arg);
 void* val_cols(void *arg);
-void* val_subs(void *arg);
 
 #endif
