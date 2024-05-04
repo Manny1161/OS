@@ -166,7 +166,7 @@ int main(int argc, char* argv[])
 	int result[NUM_CHILDREN] = {0};
 	int index = 0;
 
-	/**/
+	/*Creation of threads*/
 	for(int i=0;i<NUM_CHILDREN;i++)
 	{
 		if(i<3)
@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	/**/
+	/*Parent thread waits until all children have completed their execution*/
 	int last_child;
 	for(int i=0;i<NUM_CHILDREN;i++)
 	{
